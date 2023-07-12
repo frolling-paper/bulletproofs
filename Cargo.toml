@@ -51,19 +51,5 @@ name = "r1cs"
 required-features = ["yoloproofs"]
 
 [[bench]]
-name = "range_proof"
+name = "multilinear_pcs"
 harness = false
-
-[[bench]]
-name = "generators"
-harness = false
-
-[[bench]]
-name = "r1cs"
-harness = false
-required-features = ["yoloproofs"]
-
-[[bench]]
-name = "linear_proof"
-harness = false
-

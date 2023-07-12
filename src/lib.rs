@@ -1,9 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(nll)]
-#![feature(external_doc)]
-#![feature(try_trait)]
-#![deny(missing_docs)]
-#![doc(include = "../README.md")]
+// #![feature(external_doc)]
+// #![deny(missing_docs)]
+// #[doc = include_str!("filename")]
+// #[doc = include_str!("../README.md")]
+// #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 #![doc(html_root_url = "https://docs.rs/bulletproofs/2.0.0")]
 
@@ -14,7 +15,8 @@ extern crate serde_derive;
 
 mod util;
 
-#[doc(include = "../docs/notes-intro.md")]
+// #[doc(include = "../docs/notes-intro.md")]
+#[doc = include_str!("../docs/notes-intro.md")]
 mod notes {
     #[doc(include = "../docs/notes-ipp.md")]
     mod inner_product_proof {}
