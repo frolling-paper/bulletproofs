@@ -58,6 +58,7 @@ fn prove<const LOG_N: usize>(criterion: &mut Criterion) {
     )
     .compress();
 
+    println!("prove time {}", LOG_N);
     let mut group = criterion.benchmark_group("prove");
     group.sample_size(10);
     group.bench_function("open point", move |bencher| {
@@ -79,8 +80,39 @@ fn prove<const LOG_N: usize>(criterion: &mut Criterion) {
 }
 
 fn benches(c: &mut Criterion) {
+    prove::<5>(c);
+    prove::<6>(c);
+    prove::<7>(c);
+    prove::<8>(c);
+    prove::<9>(c);
+    prove::<10>(c);
+    prove::<11>(c);
+    prove::<12>(c);
+    prove::<13>(c);
+    prove::<14>(c);
+    prove::<15>(c);
     prove::<16>(c);
+    prove::<17>(c);
+    prove::<18>(c);
+    prove::<19>(c);
+    prove::<20>(c);
+
+    verify::<5>(c);
+    verify::<6>(c);
+    verify::<7>(c);
+    verify::<8>(c);
+    verify::<9>(c);
+    verify::<10>(c);
+    verify::<11>(c);
+    verify::<12>(c);
+    verify::<13>(c);
+    verify::<14>(c);
+    verify::<15>(c);
     verify::<16>(c);
+    verify::<17>(c);
+    verify::<18>(c);
+    verify::<19>(c);
+    verify::<20>(c);
 }
 
 fn verify<const LOG_N: usize>(criterion: &mut Criterion) {
@@ -140,6 +172,7 @@ fn verify<const LOG_N: usize>(criterion: &mut Criterion) {
         (proof, C)
     };
 
+    println!("verify time {}", LOG_N);
     let mut group = criterion.benchmark_group("prove");
     group.sample_size(10);
     group.bench_function("verify point value", move |bencher| {
