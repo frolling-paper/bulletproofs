@@ -5,6 +5,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;
+use std::mem::{size_of, size_of_val};
 
 criterion_main!(bench);
 criterion_group!(bench, benches);
@@ -26,8 +27,8 @@ fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
     out
 }
 
-fn prove<const LOG_N: usize>(criterion: &mut Criterion) {
-    let vector_len = 1 << LOG_N;
+fn prove(criterion: &mut Criterion, log_n: usize) {
+    let vector_len = 1 << log_n;
     let mut rng = rand::thread_rng();
     let bp_gens = BulletproofGens::new(vector_len, 1);
     let G: Vec<RistrettoPoint> = bp_gens.share(0).G(vector_len).cloned().collect();
@@ -37,7 +38,7 @@ fn prove<const LOG_N: usize>(criterion: &mut Criterion) {
     let B = pedersen_gens.B_blinding;
 
     let a: Vec<_> = (0..vector_len).map(|_| Scalar::random(&mut rng)).collect();
-    let point = (0..LOG_N)
+    let point = (0..log_n)
         .map(|_| Scalar::random(&mut rng))
         .collect::<Vec<_>>();
     let mut b = vec![u8_to_scalar(1)];
@@ -58,10 +59,9 @@ fn prove<const LOG_N: usize>(criterion: &mut Criterion) {
     )
     .compress();
 
-    println!("prove time {}", LOG_N);
     let mut group = criterion.benchmark_group("prove");
     group.sample_size(10);
-    group.bench_function("open point", move |bencher| {
+    group.bench_function(format!("open point {}", log_n), move |bencher| {
         bencher.iter(|| {
             LinearProof::create(
                 &mut transcript,
@@ -80,43 +80,19 @@ fn prove<const LOG_N: usize>(criterion: &mut Criterion) {
 }
 
 fn benches(c: &mut Criterion) {
-    prove::<5>(c);
-    prove::<6>(c);
-    prove::<7>(c);
-    prove::<8>(c);
-    prove::<9>(c);
-    prove::<10>(c);
-    prove::<11>(c);
-    prove::<12>(c);
-    prove::<13>(c);
-    prove::<14>(c);
-    prove::<15>(c);
-    prove::<16>(c);
-    prove::<17>(c);
-    prove::<18>(c);
-    prove::<19>(c);
-    prove::<20>(c);
-
-    verify::<5>(c);
-    verify::<6>(c);
-    verify::<7>(c);
-    verify::<8>(c);
-    verify::<9>(c);
-    verify::<10>(c);
-    verify::<11>(c);
-    verify::<12>(c);
-    verify::<13>(c);
-    verify::<14>(c);
-    verify::<15>(c);
-    verify::<16>(c);
-    verify::<17>(c);
-    verify::<18>(c);
-    verify::<19>(c);
-    verify::<20>(c);
+    for i in 5..10 {
+        commit(c, i);
+    }
+    for i in 5..10 {
+        prove(c, i);
+    }
+    for i in 5..10 {
+        verify(c, i);
+    }
 }
 
-fn verify<const LOG_N: usize>(criterion: &mut Criterion) {
-    let vector_len = 1 << LOG_N;
+fn commit(criterion: &mut Criterion, log_n: usize) {
+    let vector_len = 1 << log_n;
     let bp_gens = BulletproofGens::new(vector_len, 1);
     let mut rng = rand::thread_rng();
 
@@ -128,7 +104,52 @@ fn verify<const LOG_N: usize>(criterion: &mut Criterion) {
     let F = pedersen_gens.B;
     let B = pedersen_gens.B_blinding;
 
-    let point = (0..LOG_N)
+    let point = (0..log_n)
+        .map(|_| Scalar::random(&mut rng))
+        .collect::<Vec<_>>();
+    let mut b = vec![u8_to_scalar(1)];
+    for i in &point {
+        let len = b.len();
+        for j in 0..len {
+            b.push(b[j] * i);
+        }
+    }
+
+    // Generate the proof in its own scope to prevent reuse of
+    // prover variables by the verifier
+    // a and b are the vectors for which we want to prove c = <a,b>
+    let a: Vec<_> = (0..vector_len).map(|_| Scalar::random(&mut rng)).collect();
+
+    // C = <a, G> + r * B + <a, b> * F
+    let r = Scalar::random(&mut rng);
+
+    let mut group = criterion.benchmark_group("prove");
+    group.sample_size(10);
+    group.bench_function(format!("commit {}", log_n), move |bencher| {
+        bencher.iter(|| {
+            RistrettoPoint::vartime_multiscalar_mul(
+                a.iter().chain(iter::once(&r)),
+                G.iter().chain(iter::once(&B)),
+            )
+            .compress();
+        })
+    });
+}
+
+fn verify(criterion: &mut Criterion, log_n: usize) {
+    let vector_len = 1 << log_n;
+    let bp_gens = BulletproofGens::new(vector_len, 1);
+    let mut rng = rand::thread_rng();
+
+    // Calls `.G()` on generators, which should be a pub(crate) function only.
+    // For now, make that function public so it can be accessed from benches.
+    // We can't simply use bp_gens directly because we don't need the H generators.
+    let G: Vec<RistrettoPoint> = bp_gens.share(0).G(vector_len).cloned().collect();
+    let pedersen_gens = PedersenGens::default();
+    let F = pedersen_gens.B;
+    let B = pedersen_gens.B_blinding;
+
+    let point = (0..log_n)
         .map(|_| Scalar::random(&mut rng))
         .collect::<Vec<_>>();
     let mut b = vec![u8_to_scalar(1)];
@@ -171,11 +192,15 @@ fn verify<const LOG_N: usize>(criterion: &mut Criterion) {
 
         (proof, C)
     };
+    println!(
+        "proof size of {} variables is {} bytes",
+        log_n,
+        proof.serialized_size()
+    );
 
-    println!("verify time {}", LOG_N);
     let mut group = criterion.benchmark_group("prove");
     group.sample_size(10);
-    group.bench_function("verify point value", move |bencher| {
+    group.bench_function(format!("verify point value {}", log_n), move |bencher| {
         bencher.iter(|| {
             let mut verifier_transcript = Transcript::new(b"LinearProofBenchmark");
             let mut b = vec![u8_to_scalar(1)];
